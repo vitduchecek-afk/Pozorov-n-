@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Pozorování</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.5; background: Canvas; color: CanvasText; }
+  main { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 22px; font-weight: 500; margin: 0 0 4px; }
+  p.hint { margin: 0 0 20px; font-size: 14px; opacity: .7; }
+  label { display: block; font-size: 14px; margin: 16px 0 6px; }
+  textarea, input[type=password] { width: 100%; font: inherit; padding: 10px 12px; border: 1px solid color-mix(in srgb, CanvasText 30%, transparent); border-radius: 8px; background: Field; color: FieldText; }
+  textarea { min-height: 260px; resize: vertical; }
+  .row { display: flex; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+  button { font: inherit; padding: 10px 20px; border-radius: 8px; border: 1px solid color-mix(in srgb, CanvasText 40%, transparent); background: ButtonFace; color: ButtonText; cursor: pointer; }
+  button:disabled { opacity: .6; cursor: default; }
+  .remember { font-size: 14px; display: flex; align-items: center; gap: 6px; margin: 0; }
+  #msg { margin-top: 16px; font-size: 15px; min-height: 22px; }
+  #msg.ok { color: #1a7f37; }
+  #msg.err { color: #c62828; }
+  @media (prefers-color-scheme: dark) { #msg.ok { color: #6fdc8c; } #msg.err { color: #ff8a80; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Pozorování</h1>
+  <p class="hint">Napište nebo nadiktujte, jak se dařilo. Čas se zapíše sám.</p>
+
+  <form id="f" autocomplete="off">
+    <label for="text">Text</label>
+    <textarea id="text" placeholder="Dnes jsem učila třetí trojročí, Sebíkovi, Olíkovi a Filipkovi se dařilo dobře…"></textarea>
+
+    <label for="pw">Heslo</label>
+    <input type="password" id="pw" autocomplete="current-password">
+
+    <div class="row">
+      <button type="submit" id="send">Odeslat</button>
+      <label class="remember"><input type="checkbox" id="rem"> Zapamatovat heslo na tomto zařízení</label>
+    </div>
+  </form>
+  <div id="msg" role="status" aria-live="polite"></div>
+</main>
+
+<script src="config.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var msg = $('msg'), send = $('send'), pw = $('pw'), text = $('text'), rem = $('rem');
+  var pendingId = null;
+
+  function show(t, cls) { msg.textContent = t; msg.className = cls || ''; }
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
+
+  var saved = lsGet('pozorovani_pw');
+  if (saved) { pw.value = saved; rem.checked = true; }
+
+  function newId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  }
+
+  $('f').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var t = text.value.trim();
+    if (!t) { show('Napište nejdřív text.', 'err'); return; }
+    if (!pw.value) { show('Zadejte heslo.', 'err'); return; }
+    var url = (window.POZOROVANI_CONFIG || {}).scriptUrl;
+    if (!url) { show('Web ještě není propojený s tabulkou (chybí adresa v config.js).', 'err'); return; }
+
+    if (!pendingId) pendingId = newId();
+    send.disabled = true;
+    show('Odesílám…');
+
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ heslo: pw.value, text: t, id: pendingId })
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      if (j && j.ok) {
+        if (rem.checked) lsSet('pozorovani_pw', pw.value); else lsDel('pozorovani_pw');
+        text.value = '';
+        pendingId = null;
+        show(j.duplicate ? 'Tohle už bylo odesláno.' : 'Odesláno. Zpracuji to při dalším zpracování.', 'ok');
+      } else if (j && j.error === 'bad_password') {
+        show('Špatné heslo.', 'err');
+      } else if (j && j.error === 'empty') {
+        show('Text je prázdný.', 'err');
+      } else {
+        show('Nepodařilo se uložit. Text zůstal v poli, zkuste to znovu.', 'err');
+      }
+    })
+    .catch(function () {
+      show('Nepodařilo se potvrdit odeslání. Text zůstal v poli. Když ho odešlete znovu, nezapíše se dvakrát.', 'err');
+    })
+    .then(function () { send.disabled = false; });
+  });
+
+  text.addEventListener('input', function () { pendingId = null; });
+})();
+</script>
+</body>
+</html>
