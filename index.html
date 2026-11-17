@@ -13,15 +13,25 @@
   h1 { font-size: 22px; font-weight: 500; margin: 0 0 4px; }
   p.hint { margin: 0 0 20px; font-size: 14px; opacity: .7; }
   label { display: block; font-size: 14px; margin: 16px 0 6px; }
-  textarea, input[type=password] { width: 100%; font: inherit; padding: 10px 12px; border: 1px solid color-mix(in srgb, CanvasText 30%, transparent); border-radius: 8px; background: Field; color: FieldText; }
-  textarea { min-height: 260px; resize: vertical; }
+  .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-top: 16px; }
+  .head label { margin: 0; }
+  textarea, input[type=password], input[type=text] { width: 100%; font: inherit; padding: 10px 12px; border: 1px solid color-mix(in srgb, CanvasText 30%, transparent); border-radius: 8px; background: Field; color: FieldText; }
+  textarea { min-height: 260px; resize: vertical; margin-top: 6px; }
+  .pwwrap { position: relative; }
+  .pwwrap input { padding-right: 48px; }
+  .icon { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font: inherit; font-size: 14px; border-radius: 8px; border: 1px solid color-mix(in srgb, CanvasText 40%, transparent); background: ButtonFace; color: ButtonText; cursor: pointer; }
+  .icon svg { width: 18px; height: 18px; flex: none; }
+  #eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 36px; height: 32px; padding: 0; border: none; background: transparent; }
+  #mic { padding: 6px 12px; }
+  #mic.on { background: #c62828; border-color: #c62828; color: #fff; }
   .row { display: flex; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
-  button { font: inherit; padding: 10px 20px; border-radius: 8px; border: 1px solid color-mix(in srgb, CanvasText 40%, transparent); background: ButtonFace; color: ButtonText; cursor: pointer; }
-  button:disabled { opacity: .6; cursor: default; }
+  #send { font: inherit; padding: 10px 20px; border-radius: 8px; border: 1px solid color-mix(in srgb, CanvasText 40%, transparent); background: ButtonFace; color: ButtonText; cursor: pointer; }
+  #send:disabled { opacity: .6; cursor: default; }
   .remember { font-size: 14px; display: flex; align-items: center; gap: 6px; margin: 0; }
   #msg { margin-top: 16px; font-size: 15px; min-height: 22px; }
   #msg.ok { color: #1a7f37; }
   #msg.err { color: #c62828; }
+  #dhint { font-size: 13px; opacity: .7; margin: 6px 0 0; min-height: 18px; }
   @media (prefers-color-scheme: dark) { #msg.ok { color: #6fdc8c; } #msg.err { color: #ff8a80; } }
 </style>
 </head>
@@ -31,11 +41,23 @@
   <p class="hint">Napište nebo nadiktujte, jak se dařilo. Čas se zapíše sám.</p>
 
   <form id="f" autocomplete="off">
-    <label for="text">Text</label>
+    <div class="head">
+      <label for="text">Text</label>
+      <button type="button" id="mic" class="icon" aria-pressed="false" title="Diktovat">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v4"/><path d="M8 22h8"/></svg>
+        <span id="miclabel">Diktovat</span>
+      </button>
+    </div>
     <textarea id="text" placeholder="Dnes jsem učila třetí trojročí, Sebíkovi, Olíkovi a Filipkovi se dařilo dobře…"></textarea>
+    <p id="dhint"></p>
 
     <label for="pw">Heslo</label>
-    <input type="password" id="pw" autocomplete="current-password">
+    <div class="pwwrap">
+      <input type="password" id="pw" autocomplete="current-password">
+      <button type="button" id="eye" class="icon" aria-label="Zobrazit heslo" aria-pressed="false" title="Zobrazit heslo">
+        <svg id="eyeicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+    </div>
 
     <div class="row">
       <button type="submit" id="send">Odeslat</button>
@@ -50,6 +72,7 @@
 (function () {
   var $ = function (id) { return document.getElementById(id); };
   var msg = $('msg'), send = $('send'), pw = $('pw'), text = $('text'), rem = $('rem');
+  var mic = $('mic'), miclabel = $('miclabel'), dhint = $('dhint'), eye = $('eye'), eyeicon = $('eyeicon');
   var pendingId = null;
 
   function show(t, cls) { msg.textContent = t; msg.className = cls || ''; }
@@ -60,12 +83,95 @@
   var saved = lsGet('pozorovani_pw');
   if (saved) { pw.value = saved; rem.checked = true; }
 
+  var EYE = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>';
+  var EYE_OFF = '<path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C5 20 1 12 1 12a18.5 18.5 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12A3 3 0 1 1 9.88 9.88"/><path d="M1 1l22 22"/>';
+  eye.addEventListener('click', function () {
+    var show_ = pw.type === 'password';
+    pw.type = show_ ? 'text' : 'password';
+    eyeicon.innerHTML = show_ ? EYE_OFF : EYE;
+    eye.setAttribute('aria-pressed', show_ ? 'true' : 'false');
+    var l = show_ ? 'Skrýt heslo' : 'Zobrazit heslo';
+    eye.setAttribute('aria-label', l); eye.title = l;
+  });
+
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var rec = null, listening = false, base = '';
+
+  function setMic(on) {
+    listening = on;
+    mic.classList.toggle('on', on);
+    mic.setAttribute('aria-pressed', on ? 'true' : 'false');
+    miclabel.textContent = on ? 'Zastavit' : 'Diktovat';
+    dhint.textContent = on ? 'Poslouchám… mluvte, text se doplňuje do pole.' : '';
+  }
+
+  function joinText(a, b) {
+    if (!a) return b;
+    if (!b) return a;
+    return /\s$/.test(a) ? a + b : a + ' ' + b;
+  }
+
+  function startDictation() {
+    if (!SR) return;
+    base = text.value;
+    rec = new SR();
+    rec.lang = 'cs-CZ';
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.onresult = function (ev) {
+      var fin = '', interim = '';
+      for (var i = 0; i < ev.results.length; i++) {
+        var r = ev.results[i];
+        if (r.isFinal) fin += r[0].transcript; else interim += r[0].transcript;
+      }
+      text.value = joinText(base, (fin + interim).trim());
+    };
+    rec.onerror = function (ev) {
+      if (ev.error === 'no-speech' || ev.error === 'aborted') return;
+      if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
+        dhint.textContent = 'Mikrofon není povolený. Povolte ho v adresním řádku prohlížeče.';
+      } else {
+        dhint.textContent = 'Diktování se zastavilo (' + ev.error + ').';
+      }
+      stopDictation(true);
+    };
+    rec.onend = function () {
+      if (listening) {
+        base = text.value;
+        try { rec.start(); } catch (e) { stopDictation(true); }
+      }
+    };
+    try {
+      rec.start();
+      setMic(true);
+    } catch (e) {
+      dhint.textContent = 'Diktování se nepodařilo spustit.';
+      setMic(false);
+    }
+  }
+
+  function stopDictation(keepHint) {
+    var h = dhint.textContent;
+    listening = false;
+    if (rec) { try { rec.stop(); } catch (e) {} }
+    setMic(false);
+    if (keepHint) dhint.textContent = h;
+  }
+
+  if (!SR) {
+    mic.style.display = 'none';
+    dhint.textContent = 'Diktování v této stránce funguje v Chromu a Edgi. Ve Windows jde diktovat i klávesami Windows+H.';
+  } else {
+    mic.addEventListener('click', function () { if (listening) stopDictation(); else startDictation(); });
+  }
+
   function newId() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
   }
 
   $('f').addEventListener('submit', function (ev) {
     ev.preventDefault();
+    if (listening) stopDictation();
     var t = text.value.trim();
     if (!t) { show('Napište nejdřív text.', 'err'); return; }
     if (!pw.value) { show('Zadejte heslo.', 'err'); return; }
@@ -97,12 +203,15 @@
       }
     })
     .catch(function () {
-      show('Nepodařilo se potvrdit odeslání. Text zůstal v poli. Když ho odešlete znovu, nezapíše se dvakrát.', 'err');
+      show('Nepodařilo se spojit s tabulkou, odpověď nedošla. Text zůstal v poli. Když ho odešlete znovu, nezapíše se dvakrát.', 'err');
     })
     .then(function () { send.disabled = false; });
   });
 
-  text.addEventListener('input', function () { pendingId = null; });
+  text.addEventListener('input', function () {
+    pendingId = null;
+    if (listening) stopDictation();
+  });
 })();
 </script>
 </body>
