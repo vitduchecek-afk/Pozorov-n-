@@ -67,9 +67,9 @@
   <div id="msg" role="status" aria-live="polite"></div>
 </main>
 
-<script src="config.js"></script>
 <script>
 (function () {
+  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw4KjCq5atxr5_AEl6AwPOy8poux1yQyWcpmIrB3WiLyKLk3kNSknQ08WfBkzIBIA/exec';
   var $ = function (id) { return document.getElementById(id); };
   var msg = $('msg'), send = $('send'), pw = $('pw'), text = $('text'), rem = $('rem');
   var mic = $('mic'), miclabel = $('miclabel'), dhint = $('dhint'), eye = $('eye'), eyeicon = $('eyeicon');
@@ -175,8 +175,8 @@
     var t = text.value.trim();
     if (!t) { show('Napište nejdřív text.', 'err'); return; }
     if (!pw.value) { show('Zadejte heslo.', 'err'); return; }
-    var url = (window.POZOROVANI_CONFIG || {}).scriptUrl;
-    if (!url) { show('Web ještě není propojený s tabulkou (chybí adresa v config.js).', 'err'); return; }
+    var url = SCRIPT_URL;
+    if (!url) { show('Web ještě není propojený s tabulkou (chybí adresa skriptu).', 'err'); return; }
 
     if (!pendingId) pendingId = newId();
     send.disabled = true;

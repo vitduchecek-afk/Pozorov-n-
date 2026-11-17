@@ -4,7 +4,6 @@ Jednoduchá stránka s jedním textovým polem a heslem. Text se uloží do Goog
 
 ## Soubory
 - `index.html` – stránka (pole, heslo, tlačítko Odeslat)
-- `config.js` – adresa Apps Scriptu (vyplní se po nasazení skriptu)
 - `apps-script/Code.gs` – skript, který zapisuje do tabulky Inbox
 - `NASAZENI.md` – pokyny pro nasazení na pozorovani.dukvit.cz
 
@@ -13,7 +12,7 @@ Jednoduchá stránka s jedním textovým polem a heslem. Text se uloží do Goog
 2. Menu **Rozšíření > Apps Script**. Smažte případný výchozí kód a vložte obsah `apps-script/Code.gs`. Uložte.
 3. Vlevo **Nastavení projektu** (ozubené kolo) > **Vlastnosti skriptu** > **Přidat vlastnost**: název `HESLO`, hodnota je vaše heslo k webu. Uložte.
 4. Vpravo nahoře **Nasadit > Nové nasazení** > typ **Webová aplikace**. Spustit jako: **já**. Kdo má přístup: **kdokoli**. Nasadit a potvrdit oprávnění.
-5. Zkopírujte adresu webové aplikace (končí `/exec`) a dejte ji do `config.js` jako `scriptUrl`.
+5. Zkopírujte adresu webové aplikace (končí `/exec`) a vložte ji v `index.html` do proměnné `SCRIPT_URL`.
 
 "Kdokoli" znamená jen to, že skript přijme požadavek. Bez hesla do tabulky nic nezapíše a nic z ní nevrátí.
 
